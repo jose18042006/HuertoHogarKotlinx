@@ -53,7 +53,18 @@ android {
 // app/build.gradle.kts (SECCIÓN DE DEPENDENCIES COMPLETA)
 
 dependencies {
+    // 1. Dependencia de Persistencia (JPA/Hibernate)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // 2. Dependencia del Driver de la Base de Datos (Ejemplo: PostgreSQL)
+    // Retrofit + Gson
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 
+    // OkHttp logging (para ver las peticiones en Logcat)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     // Dependencias base de Android y Kotlin
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
