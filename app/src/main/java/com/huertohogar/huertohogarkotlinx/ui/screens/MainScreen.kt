@@ -37,7 +37,6 @@ import com.huertohogar.huertohogarkotlinx.data.repository.CatalogRepository
 import com.huertohogar.huertohogarkotlinx.ui.components.WelcomePopup
 import com.huertohogar.huertohogarkotlinx.ui.navigation.AppWindowSizeClass
 import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
-import com.huertohogar.huertohogarkotlinx.ui.screen.ProfileScreen // <- UNICA IMPORTACIÓN CORRECTA
 import com.huertohogar.huertohogarkotlinx.ui.screens.cart.CartScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.CatalogScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.ProductDetailScreen
@@ -45,7 +44,7 @@ import com.huertohogar.huertohogarkotlinx.ui.screens.home.HomeScreen
 import com.huertohogar.huertohogarkotlinx.viewmodel.CartViewModel
 import com.huertohogar.huertohogarkotlinx.viewmodel.CatalogViewModel
 import com.huertohogar.huertohogarkotlinx.viewmodel.SharedUserViewModel
-
+import com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen
 data class NavItem(
     val route: String,
     val icon: ImageVector,

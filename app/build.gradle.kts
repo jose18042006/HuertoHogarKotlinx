@@ -1,24 +1,45 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
 }
 
+// --- LECTURA DE SECRETOS ---
+val properties = Properties()
+if (rootProject.file("local.properties").exists()) {
+    properties.load(FileInputStream(rootProject.file("local.properties")))
+}
+if (rootProject.file("gradle.properties").exists()) {
+    properties.load(FileInputStream(rootProject.file("gradle.properties")))
+}
+
 android {
     namespace = "com.huertohogar.huertohogarkotlinx"
-    compileSdk = 35 // CAMBIO OBLIGATORIO: Subir a SDK 35 para las nuevas librerías
+    compileSdk = 35
+
+    // --- CONFIGURACIÓN DE FIRMA ---
+    signingConfigs {
+        create("release") {
+            keyAlias = properties.getProperty("MY_RELEASE_KEY_ALIAS")
+            keyPassword = properties.getProperty("MY_RELEASE_KEY_PASSWORD")
+            storeFile = if (properties.getProperty("MY_RELEASE_STORE_FILE") != null) {
+                file(properties.getProperty("MY_RELEASE_STORE_FILE"))
+            } else null
+            storePassword = properties.getProperty("MY_RELEASE_STORE_PASSWORD")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.huertohogar.huertohogarkotlinx"
         minSdk = 24
-        targetSdk = 35 // También subimos el target SDK
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
+        vectorDrawables { useSupportLibrary = true }
     }
 
     buildTypes {
@@ -28,8 +49,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // ASIGNAR LA FIRMA
+            signingConfig = signingConfigs.getByName("release")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -50,77 +74,38 @@ android {
     }
 }
 
-// app/build.gradle.kts (SECCIÓN DE DEPENDENCIES COMPLETA)
-
 dependencies {
-    // 1. Dependencia de Persistencia (JPA/Hibernate)
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // 2. Dependencia del Driver de la Base de Datos (Ejemplo: PostgreSQL)
-    // Retrofit + Gson
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-
-    // OkHttp logging (para ver las peticiones en Logcat)
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    // Dependencias base de Android y Kotlin
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("androidx.activity:activity-compose:1.8.2")
-
-    // COIL PARA CARGA DE IMÁGENES
     implementation("io.coil-kt:coil-compose:2.5.0")
-
-    // ---------------------------------------------------------------------------------------------
-    // JETPACK COMPOSE & MATERIAL DESIGN 3
-    // ---------------------------------------------------------------------------------------------
-    // BOM - Mantenemos la referencia
     implementation(platform("androidx.compose:compose-bom:2023.10.00"))
-
-    // FORZAMOS LA VERSIÓN COMPLETA DE CADA MODULO CRÍTICO A 1.6.0/1.2.1:
     implementation("androidx.compose.ui:ui:1.6.0")
     implementation("androidx.compose.ui:ui-graphics:1.6.0")
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.0")
     implementation("androidx.compose.material3:material3:1.2.1")
-
-    // **CRÍTICO PARA ANIMATEITEMPLACEMENT**
     implementation("androidx.compose.foundation:foundation:1.6.0")
-    // **CRÍTICO PARA TWEEN**
     implementation("androidx.compose.animation:animation:1.6.0")
     implementation("androidx.compose.animation:animation-core:1.6.0")
-
-
     implementation("androidx.compose.material3:material3-window-size-class:1.1.2")
     implementation("androidx.compose.material:material-icons-extended")
-
-
-    // ---------------------------------------------------------------------------------------------
-    // ARQUITECTURA MVVM & REACTIVIDAD (Lifecycle, ViewModel, Navigation)
-    // ---------------------------------------------------------------------------------------------
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-
-    // ---------------------------------------------------------------------------------------------
-    // PERSISTENCIA (Room y DataStore)
-    // ---------------------------------------------------------------------------------------------
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-
-
-    // ---------------------------------------------------------------------------------------------
-    // DEBUG Y TESTEO
-    // ---------------------------------------------------------------------------------------------
     testImplementation("junit:junit:4.13.2")
-    testImplementation("io.mockk:mockk:1.13.8") // MockK para mocks en tests
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3") // Para testear coroutines
+    testImplementation("io.mockk:mockk:1.13.8")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.00"))

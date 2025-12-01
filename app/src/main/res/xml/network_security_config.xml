@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Permite el tráfico HTTP (no encriptado) para el desarrollo local -->
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">10.0.2.2</domain> <!-- IP especial para el emulador de Android -->
+        <domain includeSubdomains="true">192.168.50.105</domain>
     </domain-config>
 </network-security-config>
-    
