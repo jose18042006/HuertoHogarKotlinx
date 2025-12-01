@@ -1,5 +1,6 @@
 package com.huertohogar.huertohogarkotlinx.ui.screens
-
+import com.huertohogar.huertohogarkotlinx.ui.screens.auth.LoginScreen
+import com.huertohogar.huertohogarkotlinx.ui.screens.auth.RegisterScreen
 import android.app.Application
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -14,8 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue 
-import androidx.compose.runtime.LaunchedEffect 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +135,10 @@ fun MainScreen(
                         CartScreen(cartViewModel = cartViewModel, navController = nestedNavController)
                     }
                     composable(Screen.Profile.route) {
-                        ProfileScreen(viewModel = sharedViewModel)
+                        com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen(
+                            navController = nestedNavController,
+                            sharedViewModel = sharedViewModel
+                        )
                     }
                     composable(
                         route = Screen.ProductDetail.route,
@@ -149,6 +153,7 @@ fun MainScreen(
                         )
                     }
                 }
+
             }
         }
     }
