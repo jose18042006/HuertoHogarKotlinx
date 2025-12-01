@@ -8,8 +8,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    // Emulador → backend en tu PC
-    private const val BASE_URL = "http://10.0.2.2:8080/"
+    // IP REAL DEL PC PARA CONECTAR DESDE MÓVIL FÍSICO
+    private const val BASE_URL = "http://192.168.50.105:8080/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
