@@ -21,11 +21,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.huertohogar.huertohogarkotlinx.data.model.ProductModel
 import com.huertohogar.huertohogarkotlinx.data.remote.dto.MealDto
+import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
 import com.huertohogar.huertohogarkotlinx.ui.theme.DarkGray
 import com.huertohogar.huertohogarkotlinx.ui.theme.LightBrown
 import com.huertohogar.huertohogarkotlinx.viewmodel.CartViewModel
@@ -36,13 +36,12 @@ import com.huertohogar.huertohogarkotlinx.viewmodel.CatalogViewModel
 fun ProductDetailScreen(
     productId: Int,
     navController: NavController,
-    catalogViewModel: CatalogViewModel = viewModel(),
-    cartViewModel: CartViewModel = viewModel()
+    catalogViewModel: CatalogViewModel, // <-- CORREGIDO: Ya no crea el viewModel, lo recibe
+    cartViewModel: CartViewModel
 ) {
     val uiState by catalogViewModel.uiState.collectAsState()
     val product = uiState.allProducts.find { it.id == productId }
 
-    // --- EFECTOS PARA GESTIONAR LAS RECETAS ---
     LaunchedEffect(product) {
         product?.let { catalogViewModel.loadRecipesForProduct(it.name) }
     }
@@ -70,13 +69,18 @@ fun ProductDetailScreen(
                 Text("Producto no encontrado. ID: $productId", color = MaterialTheme.colorScheme.error)
             }
         } else {
-            ProductDetailContent(product, uiState.suggestedRecipes, paddingValues)
+            ProductDetailContent(
+                product = product,
+                recipes = uiState.suggestedRecipes,
+                paddingValues = paddingValues,
+                navController = navController
+            )
         }
     }
 }
 
 @Composable
-fun ProductDetailContent(product: ProductModel, recipes: List<MealDto>, paddingValues: PaddingValues) {
+fun ProductDetailContent(product: ProductModel, recipes: List<MealDto>, paddingValues: PaddingValues, navController: NavController) {
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues).verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(300.dp).background(product.color.copy(alpha = 0.3f))) {
             Image(painter = painterResource(id = product.imageResId), contentDescription = product.name, modifier = Modifier.fillMaxSize().padding(32.dp))
@@ -97,9 +101,8 @@ fun ProductDetailContent(product: ProductModel, recipes: List<MealDto>, paddingV
             Text(text = product.description + "\n\nEste producto es cultivado de manera sostenible...", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
 
-            // --- SECCIÓN DE RECETAS SUGERIDAS ---
             if (recipes.isNotEmpty()) {
-                SuggestedRecipesSection(recipes = recipes)
+                SuggestedRecipesSection(recipes = recipes, navController = navController)
             }
 
             Spacer(Modifier.height(32.dp))
@@ -108,7 +111,7 @@ fun ProductDetailContent(product: ProductModel, recipes: List<MealDto>, paddingV
 }
 
 @Composable
-fun SuggestedRecipesSection(recipes: List<MealDto>) {
+fun SuggestedRecipesSection(recipes: List<MealDto>, navController: NavController) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "Ideas para cocinar",
@@ -118,16 +121,20 @@ fun SuggestedRecipesSection(recipes: List<MealDto>) {
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(recipes) { recipe ->
-                RecipeCard(recipe = recipe)
+                RecipeCard(recipe = recipe, onClick = {
+                    navController.navigate(Screen.RecipeDetail.createRoute(recipe.id))
+                })
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipeCard(recipe: MealDto) {
+fun RecipeCard(recipe: MealDto, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.width(160.dp), 
+        onClick = onClick,
+        modifier = Modifier.width(160.dp),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {

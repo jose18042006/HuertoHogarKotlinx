@@ -40,6 +40,7 @@ import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
 import com.huertohogar.huertohogarkotlinx.ui.screens.cart.CartScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.CatalogScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.ProductDetailScreen
+import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.RecipeDetailScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.home.HomeScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen
 import com.huertohogar.huertohogarkotlinx.viewmodel.CartViewModel
@@ -68,12 +69,11 @@ fun MainScreen(
 ) {
     val sharedViewModel: SharedUserViewModel = viewModel(factory = sharedViewModelFactory)
 
-    // --- FÁBRICA DEL CATALOGVIEWMODEL CORREGIDA ---
     val catalogViewModelFactory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            val catalogRepository = CatalogRepository() // El de datos locales
-            val recipeRepository = RecipeRepositoryImpl() // El nuevo de la API
+            val catalogRepository = CatalogRepository()
+            val recipeRepository = RecipeRepositoryImpl()
             return CatalogViewModel(catalogRepository, recipeRepository) as T
         }
     }
@@ -149,8 +149,18 @@ fun MainScreen(
                         ProductDetailScreen(
                             productId = productId,
                             navController = nestedNavController,
-                            catalogViewModel = catalogViewModel,
+                            catalogViewModel = catalogViewModel, // <-- CORREGIDO: Pasamos el ViewModel existente
                             cartViewModel = cartViewModel
+                        )
+                    }
+                    composable(
+                        route = Screen.RecipeDetail.route,
+                        arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+                        RecipeDetailScreen(
+                            recipeId = recipeId,
+                            navController = nestedNavController
                         )
                     }
                 }
@@ -158,8 +168,6 @@ fun MainScreen(
         }
     }
 }
-
-// --- El resto del archivo sin cambios ---
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
