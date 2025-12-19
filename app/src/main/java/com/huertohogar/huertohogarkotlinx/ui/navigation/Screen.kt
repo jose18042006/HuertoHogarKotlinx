@@ -10,8 +10,12 @@ sealed class Screen(val route: String) {
         fun createRoute(productId: Int) = "product_detail/$productId"
     }
 
-    // --- NUEVA RUTA ---
     object RecipeDetail : Screen("recipe_detail/{recipeId}") {
         fun createRoute(recipeId: String) = "recipe_detail/$recipeId"
     }
+
+    object AdminDashboard : Screen("admin_dashboard")
+
+    // --- ¡NUEVA RUTA! ---
+    object UserManagement : Screen("user_management")
 }

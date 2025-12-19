@@ -20,18 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.huertohogar.huertohogarkotlinx.R
-import com.huertohogar.huertohogarkotlinx.data.model.FormModel
-import com.huertohogar.huertohogarkotlinx.ui.theme.LightBrown
+import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
 import com.huertohogar.huertohogarkotlinx.viewmodel.AuthUiState
 import com.huertohogar.huertohogarkotlinx.viewmodel.AuthViewModel
 import com.huertohogar.huertohogarkotlinx.viewmodel.SharedUserViewModel
@@ -40,16 +37,15 @@ import com.huertohogar.huertohogarkotlinx.viewmodel.SharedUserViewModel
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    sharedViewModel: SharedUserViewModel
+    sharedViewModel: SharedUserViewModel,
+    authViewModel: AuthViewModel
 ) {
     val userData by sharedViewModel.formData.collectAsState()
-    val authViewModel: AuthViewModel = viewModel()
-    val authState = authViewModel.uiState
+    val authState by authViewModel.uiState.collectAsState()
     val isLoggedIn = !authState.token.isNullOrEmpty()
 
     var showPictureDialog by remember { mutableStateOf(false) }
 
-    // --- LÓGICA DE CÁMARA --- 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview(),
         onResult = { bitmap: Bitmap? -> sharedViewModel.onProfilePictureTaken(bitmap) }
@@ -78,12 +74,11 @@ fun ProfileScreen(
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = { showPictureDialog = false }) { Text("Cancelar", color = MaterialTheme.colorScheme.primary) } }
+            dismissButton = { TextButton(onClick = { showPictureDialog = false }) { Text("Cancelar") } }
         )
     }
 
     Scaffold(
-        topBar = { /* ... Tu TopAppBar sin cambios ... */ },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
@@ -93,24 +88,31 @@ fun ProfileScreen(
             if (!isLoggedIn) {
                 AuthSection(authViewModel = authViewModel, state = authState)
             } else {
-                val displayName = authState.userName ?: userData?.nombre ?: "Invitado"
+                val displayName = authState.userName ?: "Invitado"
+                // --- ¡LÍNEA CORREGIDA! ---
                 val displayEmail = userData?.email.orEmpty()
-                val hasExtraFormData = userData != null && userData!!.nombre.isNotBlank()
 
-                // ---------- CABECERA DE PERFIL MEJORADA ----------
                 ProfileHeader(
                     name = displayName,
                     email = displayEmail,
                     profileImageUri = userData?.profileImageUri,
-                    onImageClick = { showPictureDialog = true } // <-- CONECTADO
+                    onImageClick = { showPictureDialog = true }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
+                
+                UserInfoCard(displayName, displayEmail, authState.userRole ?: "Desconocido")
+                
+                Spacer(modifier = Modifier.height(24.dp))
 
-                if (hasExtraFormData && userData != null) {
-                    UserInfoCard(userData!!)
+                if (authState.userRole == "ROLE_ADMIN" || authState.userRole == "ROLE_EMPLOYEE") {
+                    AdminPanelButton(navController = navController)
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+                
+                AccountOptionsList()
+                
+                Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
                     onClick = { authViewModel.logout() },
@@ -122,20 +124,72 @@ fun ProfileScreen(
                     Spacer(Modifier.width(8.dp))
                     Text("Cerrar Sesión", style = MaterialTheme.typography.labelLarge)
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                AccountOptionsList()
             }
         }
     }
 }
 
+@Composable
+fun UserInfoCard(username: String, email: String, role: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Información de la Cuenta", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Divider()
+            ProfileInfoRow(label = "Nombre de usuario", value = username)
+            ProfileInfoRow(label = "Email", value = email)
+            ProfileInfoRow(label = "Rol", value = role, isLast = true)
+        }
+    }
+}
+
+@Composable
+fun ProfileInfoRow(label: String, value: String, isLast: Boolean = false) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value)
+    }
+    if (!isLast) {
+        Spacer(modifier = Modifier.height(4.dp))
+    }
+}
+
+@Composable
+fun AccountOptionsList() {
+    Column {
+        Text("General", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        OptionItem(label = "Mis Pedidos", icon = Icons.Default.ReceiptLong, onClick = { /* TODO */ })
+        OptionItem(label = "Editar Perfil", icon = Icons.Default.Edit, onClick = { /* TODO */ })
+        OptionItem(label = "Configuración", icon = Icons.Default.Settings, onClick = { /* TODO */ })
+        OptionItem(label = "Ayuda y Soporte", icon = Icons.Default.HelpOutline, onClick = { /* TODO */ })
+    }
+}
+
+@Composable
+fun OptionItem(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+        onClick = onClick
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(label, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, contentDescription = null)
+        }
+    }
+}
 
 @Composable
 fun AuthSection(authViewModel: AuthViewModel, state: AuthUiState) {
     var selectedTab by remember { mutableStateOf(0) }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // En la sección de login, no hay foto de perfil clicable.
         ProfileHeader(name = "Invitado", email = "", profileImageUri = null, onImageClick = {}) 
         Spacer(modifier = Modifier.height(24.dp))
         TabRow(selectedTabIndex = selectedTab, modifier = Modifier.fillMaxWidth()) {
@@ -143,49 +197,69 @@ fun AuthSection(authViewModel: AuthViewModel, state: AuthUiState) {
             Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Registrarse") })
         }
         Spacer(modifier = Modifier.height(16.dp))
+
         if (selectedTab == 0) {
             LoginForm(authViewModel = authViewModel, state = state)
         } else {
-            RegisterForm(authViewModel = authViewModel, state = state)
+            RegisterForm(
+                authViewModel = authViewModel, 
+                state = state,
+                onRegisterSuccess = { selectedTab = 0 }
+            )
         }
+        
         if (state.isLoading) {
             Spacer(modifier = Modifier.height(16.dp))
             CircularProgressIndicator()
-        }
-        state.errorMessage?.let {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = it, color = MaterialTheme.colorScheme.error)
-        }
-        state.successMessage?.let {
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = it)
+        } else {
+            state.errorMessage?.let {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = it, color = MaterialTheme.colorScheme.error)
+            }
+            state.successMessage?.let {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(text = it, color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }
 
-// ... Tus LoginForm y RegisterForm sin cambios ...
 @Composable
 fun LoginForm(authViewModel: AuthViewModel, state: AuthUiState) {
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Usuario") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = { authViewModel.login(email, password) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(8.dp)) {
+        Button(onClick = { authViewModel.login(username, password) }, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(8.dp)) {
             Text("Entrar", style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
 @Composable
-fun RegisterForm(authViewModel: AuthViewModel, state: AuthUiState) {
-    var name by remember { mutableStateOf(state.userName ?: "") }
+fun RegisterForm(
+    authViewModel: AuthViewModel, 
+    state: AuthUiState, 
+    onRegisterSuccess: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    LaunchedEffect(state.successMessage) {
+        if (state.successMessage?.contains("exitosamente") == true) {
+            name = ""
+            email = ""
+            password = ""
+            onRegisterSuccess()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre de Usuario") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(16.dp))
@@ -197,8 +271,6 @@ fun RegisterForm(authViewModel: AuthViewModel, state: AuthUiState) {
     }
 }
 
-
-// ---------- CABECERA DE PERFIL MODIFICADA ----------
 @Composable
 fun ProfileHeader(name: String, email: String, profileImageUri: String?, onImageClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -214,10 +286,9 @@ fun ProfileHeader(name: String, email: String, profileImageUri: String?, onImage
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    .clickable(onClick = onImageClick),
+                    .clickable(onClick = onImageClick, enabled = onImageClick != {}),
                 contentScale = ContentScale.Crop
             )
-            // Solo mostrar el icono de la cámara si la imagen es clicable
             if (onImageClick != {}) {
                 Icon(
                     imageVector = Icons.Default.PhotoCamera,
@@ -227,67 +298,23 @@ fun ProfileHeader(name: String, email: String, profileImageUri: String?, onImage
                 )
             }
         }
-
         Spacer(Modifier.height(12.dp))
-
         Text(text = name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-
         if (email.isNotBlank()) {
             Text(text = email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-// ... El resto de tus componentes (UserInfoCard, etc.) sin cambios ...
 @Composable
-fun UserInfoCard(data: FormModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "Datos de Miembro", style = MaterialTheme.typography.titleLarge, color = LightBrown, modifier = Modifier.padding(bottom = 8.dp))
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 1.dp)
-            ProfileInfoRow("Edad", data.edad.toString())
-            ProfileInfoRow("Aceptó Términos", if (data.aceptaTerminos) "Sí" else "No")
-            ProfileInfoRow("Comentario", data.comentario ?: "N/A", isLast = true)
-            TextButton(onClick = { /* Navegar a edición de perfil (tu FormScreen) */ }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Editar", modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Editar Perfil", style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
+fun AdminPanelButton(navController: NavController) {
+    Button(
+        onClick = { navController.navigate(Screen.AdminDashboard.route) },
+        modifier = Modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Icon(Icons.Filled.AdminPanelSettings, contentDescription = "Panel de Administración")
+        Spacer(Modifier.width(8.dp))
+        Text("Panel de Administración", style = MaterialTheme.typography.labelLarge)
     }
-}
-
-@Composable
-fun ProfileInfoRow(label: String, value: String, isLast: Boolean = false) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-    }
-    if (!isLast) {
-        Divider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.5.dp)
-    }
-}
-
-@Composable
-fun AccountOptionsList() {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Configuración", style = MaterialTheme.typography.titleMedium, color = LightBrown, modifier = Modifier.padding(bottom = 8.dp))
-        OptionItem(label = "Mis Pedidos", onClick = { /* Navegación a historial */ })
-        OptionItem(label = "Direcciones de Envío", onClick = { /* Navegación a direcciones */ })
-        OptionItem(label = "Métodos de Pago", onClick = { /* Navegación a pagos */ })
-    }
-}
-
-@Composable
-fun OptionItem(label: String, onClick: () -> Unit) {
-    ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        headlineContent = { Text(label) },
-        leadingContent = { Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-        trailingContent = { Icon(Icons.Default.ArrowForward, contentDescription = null) },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface)
-    )
-    Divider(color = MaterialTheme.colorScheme.surfaceVariant, thickness = 0.5.dp)
 }

@@ -1,133 +1,90 @@
 package com.huertohogar.huertohogarkotlinx.viewmodel
 
 import android.app.Application
-import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.huertohogar.huertohogarkotlinx.data.local.AppDatabase
-import com.huertohogar.huertohogarkotlinx.data.local.AppSettingsDataStore
 import com.huertohogar.huertohogarkotlinx.data.model.FormModel
-import com.huertohogar.huertohogarkotlinx.data.repository.UserRepository
+import com.huertohogar.huertohogarkotlinx.data.model.UserDto
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
-import java.util.UUID
 
-class SharedUserViewModel(application: Application, private val repository: UserRepository) : AndroidViewModel(application) {
+class SharedUserViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _formData = MutableStateFlow<FormModel?>(null)
-    val formData: StateFlow<FormModel?> = _formData.asStateFlow()
-
-    private val _showWelcomePopup = MutableStateFlow(false)
-    val showWelcomePopup: StateFlow<Boolean> = _showWelcomePopup.asStateFlow()
+    val formData = _formData.asStateFlow()
 
     private val _popupChecked = MutableStateFlow(false)
-    val popupChecked: StateFlow<Boolean> = _popupChecked.asStateFlow()
+    val popupChecked = _popupChecked.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            repository.getFormData().collect { formModel ->
-                _formData.value = formModel
-            }
-        }
-        checkPopupStatus()
-    }
-
-    private fun checkPopupStatus() {
-        viewModelScope.launch {
-            repository.hasSeenIntro().collect { hasSeen ->
-                if (!hasSeen) {
-                    _showWelcomePopup.value = true
-                }
-            }
-        }
-    }
-
-    fun handlePopupDismissal(shouldNeverShowAgain: Boolean, navigateToProfile: () -> Unit) {
-        viewModelScope.launch {
-            _showWelcomePopup.value = false
-            if (shouldNeverShowAgain) {
-                repository.setSeenIntro(true)
-            }
-            navigateToProfile()
-        }
-    }
-
-    fun setPopupChecked(checked: Boolean) {
-        _popupChecked.value = checked
-    }
+    private val _showWelcomePopup = MutableStateFlow(true)
+    val showWelcomePopup = _showWelcomePopup.asStateFlow()
 
     fun saveFormData(data: FormModel) {
-        viewModelScope.launch {
-            repository.saveFormData(data)
-        }
+        _formData.value = data
     }
-
-    // --- LÓGICA FINAL Y ROBUSTA PARA FOTO DE PERFIL ---
 
     fun onProfilePictureTaken(bitmap: Bitmap?) {
         bitmap ?: return
-        viewModelScope.launch {
-            // 1. Guardar la nueva foto en almacenamiento y obtener su URI.
-            val newImageUri = saveBitmapToInternalStorage(bitmap)
-
-            // 2. Obtener los datos MÁS RECIENTES directamente de la base de datos.
-            val currentData = repository.getFormData().first() ?: FormModel()
-
-            // 3. Crear el modelo actualizado, preservando los datos existentes.
-            val updatedUserData = currentData.copy(profileImageUri = newImageUri.toString())
-
-            // 4. Guardar el objeto completo en la base de datos.
-            repository.saveFormData(updatedUserData)
+        val file = File(getApplication<Application>().cacheDir, "profile_picture.jpg")
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
         }
+        _formData.update { it?.copy(profileImageUri = file.toURI().toString()) ?: FormModel(profileImageUri = file.toURI().toString()) }
     }
 
     fun deleteProfilePicture() {
-        viewModelScope.launch {
-            val currentData = repository.getFormData().first() ?: return@launch
+        val currentUri = _formData.value?.profileImageUri
+        if (currentUri != null) {
+            try {
+                val file = File(Uri.parse(currentUri).path!!)
+                if (file.exists()) file.delete()
+            } catch (e: Exception) { /* Ignorar error si el archivo no existe */ }
+        }
+        _formData.update { it?.copy(profileImageUri = null) }
+    }
 
-            currentData.profileImageUri?.let {
-                try {
-                    val file = File(Uri.parse(it).path!!)
-                    if (file.exists()) file.delete()
-                } catch (_: Exception) { /* Ignorar si falla */ }
-            }
-
-            val updatedUserData = currentData.copy(profileImageUri = null)
-            repository.saveFormData(updatedUserData)
+    fun updateUserDataFromDto(userDto: UserDto) {
+        _formData.update { currentData ->
+            currentData?.copy(
+                nombre = userDto.username,
+                email = userDto.email
+            ) ?: FormModel(
+                nombre = userDto.username,
+                email = userDto.email
+            )
         }
     }
 
-    private fun saveBitmapToInternalStorage(bitmap: Bitmap): Uri {
-        val context = getApplication<Application>().applicationContext
-        val wrapper = context.getDir("images", Context.MODE_PRIVATE)
-        val file = File(wrapper, "${UUID.randomUUID()}.jpg")
-        val stream = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
-        stream.flush()
-        stream.close()
-        return Uri.fromFile(file)
+    fun setPopupChecked(isChecked: Boolean) {
+        _popupChecked.value = isChecked
     }
 
-    companion object {
-        fun Factory(application: Application): ViewModelProvider.Factory {
-            return object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                    val database = AppDatabase.getDatabase(application)
-                    val userDao = database.userDao()
-                    val dataStore = AppSettingsDataStore(application)
-                    val repository = UserRepository(userDao, dataStore)
-                    return SharedUserViewModel(application, repository) as T
-                }
-            }
+    fun handlePopupDismissal(shouldNeverShowAgain: Boolean, navigateToProfile: () -> Unit) {
+        if (shouldNeverShowAgain) {
+            // Aquí guardarías en DataStore que el usuario no quiere ver más el popup
+        }
+        if (navigateToProfile != {}) {
+            navigateToProfile()
+        }
+        _showWelcomePopup.value = false
+    }
+
+    fun dismissWelcomePopup() {
+        _showWelcomePopup.value = false
+    }
+
+    class Factory(private val application: Application) : ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            return SharedUserViewModel(application) as T
         }
     }
 }
