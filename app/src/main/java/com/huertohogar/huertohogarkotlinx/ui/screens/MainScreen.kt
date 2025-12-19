@@ -1,6 +1,5 @@
 package com.huertohogar.huertohogarkotlinx.ui.screens
-import com.huertohogar.huertohogarkotlinx.ui.screens.auth.LoginScreen
-import com.huertohogar.huertohogarkotlinx.ui.screens.auth.RegisterScreen
+
 import android.app.Application
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -33,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.huertohogar.huertohogarkotlinx.data.remote.repository.recipe.RecipeRepositoryImpl
 import com.huertohogar.huertohogarkotlinx.data.repository.CatalogRepository
 import com.huertohogar.huertohogarkotlinx.ui.components.WelcomePopup
 import com.huertohogar.huertohogarkotlinx.ui.navigation.AppWindowSizeClass
@@ -40,11 +40,13 @@ import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
 import com.huertohogar.huertohogarkotlinx.ui.screens.cart.CartScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.CatalogScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.ProductDetailScreen
+import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.RecipeDetailScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.home.HomeScreen
+import com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen
 import com.huertohogar.huertohogarkotlinx.viewmodel.CartViewModel
 import com.huertohogar.huertohogarkotlinx.viewmodel.CatalogViewModel
 import com.huertohogar.huertohogarkotlinx.viewmodel.SharedUserViewModel
-import com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen
+
 data class NavItem(
     val route: String,
     val icon: ImageVector,
@@ -58,7 +60,7 @@ val bottomNavItems = listOf(
     NavItem(Screen.Profile.route, Icons.Filled.Person, "Perfil")
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     appNavHostController: NavHostController,
@@ -66,15 +68,18 @@ fun MainScreen(
     sharedViewModelFactory: ViewModelProvider.Factory
 ) {
     val sharedViewModel: SharedUserViewModel = viewModel(factory = sharedViewModelFactory)
-    val catalogRepository = CatalogRepository()
+
     val catalogViewModelFactory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            return CatalogViewModel(catalogRepository) as T
+            val catalogRepository = CatalogRepository()
+            val recipeRepository = RecipeRepositoryImpl()
+            return CatalogViewModel(catalogRepository, recipeRepository) as T
         }
     }
     val catalogViewModel: CatalogViewModel = viewModel(factory = catalogViewModelFactory)
     val cartViewModel: CartViewModel = viewModel()
+
     val nestedNavController = rememberNavController()
     val navBackStackEntry by nestedNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -134,10 +139,7 @@ fun MainScreen(
                         CartScreen(cartViewModel = cartViewModel, navController = nestedNavController)
                     }
                     composable(Screen.Profile.route) {
-                        com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen(
-                            navController = nestedNavController,
-                            sharedViewModel = sharedViewModel
-                        )
+                        ProfileScreen(navController = nestedNavController, sharedViewModel = sharedViewModel)
                     }
                     composable(
                         route = Screen.ProductDetail.route,
@@ -147,12 +149,21 @@ fun MainScreen(
                         ProductDetailScreen(
                             productId = productId,
                             navController = nestedNavController,
-                            catalogViewModel = catalogViewModel,
+                            catalogViewModel = catalogViewModel, // <-- CORREGIDO: Pasamos el ViewModel existente
                             cartViewModel = cartViewModel
                         )
                     }
+                    composable(
+                        route = Screen.RecipeDetail.route,
+                        arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+                        RecipeDetailScreen(
+                            recipeId = recipeId,
+                            navController = nestedNavController
+                        )
+                    }
                 }
-
             }
         }
     }

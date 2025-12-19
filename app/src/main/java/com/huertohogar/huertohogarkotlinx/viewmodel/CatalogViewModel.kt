@@ -3,6 +3,8 @@ package com.huertohogar.huertohogarkotlinx.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.huertohogar.huertohogarkotlinx.data.model.ProductModel
+import com.huertohogar.huertohogarkotlinx.data.remote.dto.MealDto
+import com.huertohogar.huertohogarkotlinx.data.remote.repository.recipe.RecipeRepository
 import com.huertohogar.huertohogarkotlinx.data.repository.CatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,24 +12,37 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel para gestionar el Catálogo de Productos (Home y Catálogo).
- */
-class CatalogViewModel(private val repository: CatalogRepository) : ViewModel() {
+class CatalogViewModel(
+    private val catalogRepository: CatalogRepository,
+    private val recipeRepository: RecipeRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CatalogUiState(isLoading = true))
     val uiState: StateFlow<CatalogUiState> = _uiState.asStateFlow()
+
+    private val ingredientMap = mapOf(
+        "tomates" to "tomato",
+        "lechuga" to "lettuce",
+        "zanahorias" to "carrot",
+        "manzanas" to "apple",
+        "papas" to "potato",
+        "naranjas" to "orange",
+        "brócoli" to "broccoli",
+        "fresas" to "strawberry"
+    )
+
+    // CORRECCIÓN: Añadimos "potato" a la lista de búsqueda por nombre
+    private val searchByNameIngredients = setOf("apple", "strawberry", "orange", "potato")
 
     init {
         loadProducts()
     }
 
-    /** Carga los productos del repositorio de forma asíncrona. */
     private fun loadProducts() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val products = repository.getProducts()
+                val products = catalogRepository.getProducts()
                 _uiState.update { currentState ->
                     currentState.copy(
                         allProducts = products,
@@ -41,40 +56,43 @@ class CatalogViewModel(private val repository: CatalogRepository) : ViewModel() 
         }
     }
 
-    // Función para actualizar el filtro de categoría
     fun filterProducts(category: String) {
-        // Al cambiar de categoría, limpiamos la búsqueda
         _uiState.update { it.copy(selectedCategory = category, searchQuery = "") }
     }
 
-    // NUEVA FUNCIÓN: Actualiza el Query de Búsqueda
     fun updateSearchQuery(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }
 
-    // FUNCIÓN DE BÚSQUEDA Y FILTRADO COMBINADO (CORRIGE AMBIGÜEDAD)
     fun getFilteredProducts(): List<ProductModel> {
         val all = _uiState.value.allProducts
         val category = _uiState.value.selectedCategory
-        // La consulta de búsqueda está limpia y en minúsculas
         val query = _uiState.value.searchQuery.trim().lowercase()
 
-        // 1. Filtrar por Categoría
-        val filteredByCategory = if (category == "Todo") {
-            all
-        } else {
-            all.filter { it.category == category }
-        }
+        val filteredByCategory = if (category == "Todo") all else all.filter { it.category == category }
+        if (query.isBlank()) return filteredByCategory
 
-        // Si la búsqueda está vacía, regresamos solo el filtro por categoría
-        if (query.isBlank()) {
-            return filteredByCategory
+        return filteredByCategory.filter {
+            it.name.lowercase().contains(query) || it.description.lowercase().contains(query)
         }
+    }
 
-        // 2. Filtrar por Consulta (Resuelve la ambigüedad con argumentos explícitos)
-        return filteredByCategory.filter { product ->
-            product.name.lowercase().contains(query, ignoreCase = false) ||
-                    product.description.lowercase().contains(query, ignoreCase = false)
+    fun loadRecipesForProduct(productName: String) {
+        viewModelScope.launch {
+            val searchKey = productName.split(" ").first().lowercase()
+            val ingredientInEnglish = ingredientMap[searchKey] ?: return@launch
+
+            val recipes = if (ingredientInEnglish in searchByNameIngredients) {
+                recipeRepository.searchRecipesByName(ingredientInEnglish)
+            } else {
+                recipeRepository.getRecipesForIngredient(ingredientInEnglish)
+            }
+
+            _uiState.update { it.copy(suggestedRecipes = recipes) }
         }
+    }
+
+    fun clearRecipes() {
+        _uiState.update { it.copy(suggestedRecipes = emptyList()) }
     }
 }

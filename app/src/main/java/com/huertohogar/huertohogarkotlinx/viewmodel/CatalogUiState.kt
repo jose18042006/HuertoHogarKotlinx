@@ -1,17 +1,18 @@
 package com.huertohogar.huertohogarkotlinx.viewmodel
 
 import com.huertohogar.huertohogarkotlinx.data.model.ProductModel
+import com.huertohogar.huertohogarkotlinx.data.remote.dto.MealDto
 
 /**
- * ESTADO PRINCIPAL DEL CATÁLOGO
- * Lo separamos para evitar conflictos de importación y aseguramos el campo 'searchQuery'.
+ * Define el estado completo de la interfaz para las pantallas de catálogo.
+ * Esta es la única fuente de verdad para el estado.
  */
 data class CatalogUiState(
+    val isLoading: Boolean = false,
     val allProducts: List<ProductModel> = emptyList(),
     val offers: List<ProductModel> = emptyList(),
-    val categories: List<String> = listOf("Todo", "Verduras", "Frutas", "Otros"),
     val selectedCategory: String = "Todo",
-    val searchQuery: String = "", // <--- ESTE ES EL CAMPO QUE FALTABA
-    val isLoading: Boolean = false,
+    val searchQuery: String = "",
+    val suggestedRecipes: List<MealDto> = emptyList(),
     val errorMessage: String? = null
 )
