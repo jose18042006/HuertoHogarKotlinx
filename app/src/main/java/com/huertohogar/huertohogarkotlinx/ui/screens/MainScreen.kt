@@ -8,21 +8,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -37,15 +31,15 @@ import com.huertohogar.huertohogarkotlinx.data.repository.CatalogRepository
 import com.huertohogar.huertohogarkotlinx.ui.components.WelcomePopup
 import com.huertohogar.huertohogarkotlinx.ui.navigation.AppWindowSizeClass
 import com.huertohogar.huertohogarkotlinx.ui.navigation.Screen
+import com.huertohogar.huertohogarkotlinx.ui.screens.admin.AdminDashboardScreen
+import com.huertohogar.huertohogarkotlinx.ui.screens.admin.UserManagementScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.cart.CartScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.CatalogScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.ProductDetailScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.catalog.RecipeDetailScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.home.HomeScreen
 import com.huertohogar.huertohogarkotlinx.ui.screens.profile.ProfileScreen
-import com.huertohogar.huertohogarkotlinx.viewmodel.CartViewModel
-import com.huertohogar.huertohogarkotlinx.viewmodel.CatalogViewModel
-import com.huertohogar.huertohogarkotlinx.viewmodel.SharedUserViewModel
+import com.huertohogar.huertohogarkotlinx.viewmodel.*
 
 data class NavItem(
     val route: String,
@@ -55,7 +49,7 @@ data class NavItem(
 
 val bottomNavItems = listOf(
     NavItem(Screen.Home.route, Icons.Filled.Home, "Inicio"),
-    NavItem(Screen.Catalog.route, Icons.Filled.LocalMall, "Catálogo"),
+    NavItem(Screen.Catalog.route, Icons.Filled.Store, "Catálogo"),
     NavItem(Screen.Cart.route, Icons.Filled.ShoppingCart, "Carrito"),
     NavItem(Screen.Profile.route, Icons.Filled.Person, "Perfil")
 )
@@ -68,17 +62,31 @@ fun MainScreen(
     sharedViewModelFactory: ViewModelProvider.Factory
 ) {
     val sharedViewModel: SharedUserViewModel = viewModel(factory = sharedViewModelFactory)
+    val application = LocalContext.current.applicationContext as Application
 
-    val catalogViewModelFactory = object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            val catalogRepository = CatalogRepository()
-            val recipeRepository = RecipeRepositoryImpl()
-            return CatalogViewModel(catalogRepository, recipeRepository) as T
+    // --- FÁBRICA UNIFICADA Y ROBUSTA PARA VIEWMODELS ---
+    val mainViewModelFactory = remember(application, sharedViewModel) {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return when {
+                    modelClass.isAssignableFrom(AuthViewModel::class.java) ->
+                        AuthViewModel(application, sharedViewModel) as T
+                    modelClass.isAssignableFrom(CatalogViewModel::class.java) ->
+                        CatalogViewModel(CatalogRepository(), RecipeRepositoryImpl()) as T
+                    modelClass.isAssignableFrom(AdminViewModel::class.java) ->
+                        AdminViewModel() as T
+                    else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+                }
+            }
         }
     }
-    val catalogViewModel: CatalogViewModel = viewModel(factory = catalogViewModelFactory)
-    val cartViewModel: CartViewModel = viewModel()
+
+    // --- CREACIÓN DE VIEWMODELS USANDO LA FÁBRICA UNIFICADA ---
+    val authViewModel: AuthViewModel = viewModel(factory = mainViewModelFactory)
+    val catalogViewModel: CatalogViewModel = viewModel(factory = mainViewModelFactory)
+    val adminViewModel: AdminViewModel = viewModel(factory = mainViewModelFactory)
+    val cartViewModel: CartViewModel = viewModel() // Sin dependencias, el default está bien
 
     val nestedNavController = rememberNavController()
     val navBackStackEntry by nestedNavController.currentBackStackEntryAsState()
@@ -139,7 +147,11 @@ fun MainScreen(
                         CartScreen(cartViewModel = cartViewModel, navController = nestedNavController)
                     }
                     composable(Screen.Profile.route) {
-                        ProfileScreen(navController = nestedNavController, sharedViewModel = sharedViewModel)
+                        ProfileScreen(
+                            navController = nestedNavController,
+                            sharedViewModel = sharedViewModel,
+                            authViewModel = authViewModel
+                        )
                     }
                     composable(
                         route = Screen.ProductDetail.route,
@@ -149,7 +161,7 @@ fun MainScreen(
                         ProductDetailScreen(
                             productId = productId,
                             navController = nestedNavController,
-                            catalogViewModel = catalogViewModel, // <-- CORREGIDO: Pasamos el ViewModel existente
+                            catalogViewModel = catalogViewModel,
                             cartViewModel = cartViewModel
                         )
                     }
@@ -161,6 +173,18 @@ fun MainScreen(
                         RecipeDetailScreen(
                             recipeId = recipeId,
                             navController = nestedNavController
+                        )
+                    }
+                    composable(Screen.AdminDashboard.route) {
+                        AdminDashboardScreen(
+                            navController = nestedNavController,
+                            authViewModel = authViewModel
+                        )
+                    }
+                    composable(Screen.UserManagement.route) {
+                        UserManagementScreen(
+                            navController = nestedNavController,
+                            adminViewModel = adminViewModel
                         )
                     }
                 }
